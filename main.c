@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <time.h>
 
+// Dimension de la matrice
 #define N 30
+
 
 void afficherMatrice(int matrice[N][N]) {
     for (int i = 0; i < N; i++) {
@@ -19,7 +21,7 @@ void afficherMatrice(int matrice[N][N]) {
 }
 
 
-// Définie dans une matrice temporaire l'état de la case [i][j] en fonction de la génération actuelle
+// Calcule dans une matrice temporaire l'état de la case [i][j] en fonction de la génération actuelle
 void nextGeneration(int matrice[N][N], int matriceNplus1[N][N], int i, int j) {
     int compteurDeCellulesAdjacentesVivantes = 0;
     int currentState = matrice[i][j];
@@ -53,13 +55,19 @@ void nextGeneration(int matrice[N][N], int matriceNplus1[N][N], int i, int j) {
             matriceNplus1[i][j] = 0;
         }
     }
-
 }
 
 int main() {
-    int taux = 50;
-    printf("Quelle est le taux de cellule vivante a l'initialisation ? (Default : 50%%)\n");
-    scanf("%i", &taux);
+
+    //Définition du teux de cellules vivantes à la génération 0
+    int tauxCellulesVivantes = 50;
+    printf("Quelle est le taux de cellules vivantes a l'initialisation ? (Default : 50%%)\n");
+    if (scanf("%i", &tauxCellulesVivantes) != 1) {
+        // On vide le buffer pour éviter les boucles infinies
+
+        while (getchar() != '\n');
+    }
+
     //Pour avoir de vraies valeurs aléatoires
     srand(time(0));
     //definition de la matrice de départ
@@ -67,12 +75,7 @@ int main() {
     // Remplir la matrice avec des valeurs aléatoires
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < N; j++) {
-            matrice[i][j] = (rand() % 100 + 1 <= taux) ? 1 : 0;
-            // if (i>=3 && j>=3 && i<=5 && j<=5) {
-            //     matrice[i][j] = 1;
-            // } else {
-            //     matrice[i][j] = 0;
-            // }
+            matrice[i][j] = (rand() % 100 + 1 <= tauxCellulesVivantes) ? 1 : 0;
         }
     }
     afficherMatrice(matrice);
@@ -86,23 +89,25 @@ int main() {
         printf("Generation %d\n", generation);
         for (int i = 0; i < N; i++) {
             for (int j = 0; j < N; j++) {
+                //Copie de l'état actuel de la cellule en cas de status quo
                 matriceTemp[i][j] = matrice[i][j];
                 nextGeneration(matrice,matriceTemp, i, j);
             }
         }
         afficherMatrice(matriceTemp);
 
-        //Copier la matrice 
+        //Copier la matrice N+1 dans la matrice actuelle après la fin des calculs
         for (int i = 0; i < N; i++) {
             for (int j = 0; j < N; j++) {
                 matrice[i][j] = matriceTemp[i][j];
             }
         }
+
+        //Pause pour voir la nouvelle génération dans la console
         system("pause");
         generation++;
-        
-    }while (generation < 100);
 
+    }while (generation < 100);
 
 
     return 0;
