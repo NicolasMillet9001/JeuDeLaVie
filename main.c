@@ -1,8 +1,29 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <SDL.h>
 
 #define N 30
+#define CELL_SIZE 10
+#define WIDTH (N * CELL_SIZE)
+#define HEIGHT (N * CELL_SIZE)
+#define GENERATION_DELAY_MS 100 // Délai en ms entre les générations
+
+void drawGrid(SDL_Renderer *renderer, int grid[N][N]) {
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            if (grid[i][j]) {
+                SDL_Rect cell = { j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE };
+                SDL_RenderFillRect(renderer, &cell);
+            }
+        }
+    }
+    SDL_RenderPresent(renderer);
+}
 
 void afficherMatrice(int matrice[N][N]) {
     for (int i = 0; i < N; i++) {
@@ -56,54 +77,114 @@ void nextGeneration(int matrice[N][N], int matriceNplus1[N][N], int i, int j) {
 
 }
 
-int main() {
+int main(int argc, char* argv[]) { // main doit avoir ces arguments pour SDL
     int taux = 50;
     printf("Quelle est le taux de cellule vivante a l'initialisation ? (Default : 50%%)\n");
     scanf("%i", &taux);
+
     //Pour avoir de vraies valeurs aléatoires
     srand(time(0));
+
     //definition de la matrice de départ
     int matrice[N][N];
     // Remplir la matrice avec des valeurs aléatoires
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < N; j++) {
             matrice[i][j] = (rand() % 100 + 1 <= taux) ? 1 : 0;
-            // if (i>=3 && j>=3 && i<=5 && j<=5) {
-            //     matrice[i][j] = 1;
-            // } else {
-            //     matrice[i][j] = 0;
-            // }
         }
     }
-    afficherMatrice(matrice);
+
+    // --- Initialisation de SDL ---
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        fprintf(stderr, "Erreur lors de l'initialisation de la SDL : %s\n", SDL_GetError());
+        return 1;
+    }
+
+    SDL_Window* window = SDL_CreateWindow("Jeu de la Vie",
+                                        SDL_WINDOWPOS_CENTERED,
+                                        SDL_WINDOWPOS_CENTERED,
+                                        WIDTH, HEIGHT,
+                                        0); // Pas de flags particuliers
+    if (window == NULL) {
+        fprintf(stderr, "Erreur lors de la création de la fenêtre : %s\n", SDL_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1,
+                                              SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (renderer == NULL) {
+        fprintf(stderr, "Erreur lors de la création du renderer : %s\n", SDL_GetError());
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+    // --- Fin de l'initialisation de SDL ---
 
 
     int generation = 1;
-    //boucle répétée pour toutes les nouvelles générations du jeu de la vie
-    do {
-        // matrice qui va garder en mémoire la prochaine génération
-        int matriceTemp[N][N];
-        printf("Generation %d\n", generation);
-        for (int i = 0; i < N; i++) {
-            for (int j = 0; j < N; j++) {
-                matriceTemp[i][j] = matrice[i][j];
-                nextGeneration(matrice,matriceTemp, i, j);
+    int running = 1; // Variable pour contrôler la boucle principale
+    SDL_Event event; // Pour gérer les événements
+
+    // Boucle principale du jeu
+    while (running) {
+        // --- 1. Gestion des événements ---
+        // Vérifie si l'utilisateur veut quitter
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                running = 0;
+            }
+            // Optionnel : quitter avec la touche 'q'
+            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q) {
+                running = 0;
             }
         }
-        afficherMatrice(matriceTemp);
 
-        //Copier la matrice 
+        // --- 2. Logique du jeu (calcul de la prochaine génération) ---
+        int matriceTemp[N][N];
+
+        // Met à jour le titre de la fenêtre avec le numéro de génération
+        char title[50];
+        snprintf(title, 50, "Jeu de la Vie - Generation %d", generation);
+        SDL_SetWindowTitle(window, title);
+
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                matriceTemp[i][j] = matrice[i][j]; // Copie état actuel
+                nextGeneration(matrice, matriceTemp, i, j); // Calcule N+1
+            }
+        }
+
+        // --- 3. Affichage (remplace afficherMatrice) ---
+        drawGrid(renderer, matriceTemp);
+
+        // --- 4. Mise à jour de l'état ---
+        // Copier la matrice temporaire dans la matrice principale
         for (int i = 0; i < N; i++) {
             for (int j = 0; j < N; j++) {
                 matrice[i][j] = matriceTemp[i][j];
             }
         }
-        system("pause");
+
+        // --- 5. Contrôle de la boucle ---
         generation++;
-        
-    }while (generation < 100);
+
+        // Arrête la simulation après 100 générations (comme l'original)
+        // Vous pouvez commenter cette ligne pour une simulation infinie
+        if (generation >= 100) {
+            running = 0;
+        }
+
+        // Pause pour ralentir la simulation (remplace system("pause"))
+        SDL_Delay(GENERATION_DELAY_MS);
+
+    } // Fin de la boucle while(running)
 
 
+    // --- Nettoyage de SDL ---
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
 
     return 0;
 }
