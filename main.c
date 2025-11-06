@@ -31,20 +31,6 @@ void drawGrid(SDL_Renderer *renderer, int grid[N][N]) {
     SDL_RenderPresent(renderer);
 }
 
-void afficherMatrice(int matrice[N][N]) {
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            if (matrice[i][j] == 0)
-                printf(" .  ");
-            else if (matrice[i][j] == 1)
-                printf(" #  ");
-            else
-                printf(" ?  "); // Au cas où il y a d'autres valeurs
-        }
-        printf("\n");
-    }
-}
-
 
 // Définie dans une matrice temporaire l'état de la case [i][j] en fonction de la génération actuelle
 void nextGeneration(int matrice[N][N], int matriceNplus1[N][N], int i, int j) {
