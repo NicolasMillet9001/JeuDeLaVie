@@ -10,18 +10,47 @@
 #define GENERATION_DELAY_MS 100 // Délai en ms entre les générations
 
 void drawGrid(SDL_Renderer *renderer, int grid[N][N]) {
+
+    // 1. On dessine le fond en noir
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    // 2. On dessine les cellules vivantes (vert)
+    SDL_SetRenderDrawColor(renderer, 125, 125, 180, 255);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < N; j++) {
             if (grid[i][j]) {
+                // Crée un rectangle pour la cellule vivante
                 SDL_Rect cell = { j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE };
                 SDL_RenderFillRect(renderer, &cell);
             }
         }
     }
+
+    // --- AJOUT : DESSIN DES LIGNES DE LA GRILLE ---
+    // On choisit une couleur pour les lignes (par exemple, gris foncé)
+    SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
+
+    // Dessine les lignes verticales
+    for (int i = 0; i <= N; i++) {
+        SDL_RenderDrawLine(renderer,
+                           i * CELL_SIZE,  // x1
+                           0,              // y1
+                           i * CELL_SIZE,  // x2
+                           HEIGHT);        // y2
+    }
+
+    // Dessine les lignes horizontales
+    for (int j = 0; j <= N; j++) {
+        SDL_RenderDrawLine(renderer,
+                           0,              // x1
+                           j * CELL_SIZE,  // y1
+                           WIDTH,          // x2
+                           j * CELL_SIZE); // y2
+    }
+    // --- FIN DE L'AJOUT ---
+
+    // 3. On affiche le tout à l'écran
     SDL_RenderPresent(renderer);
 }
 
