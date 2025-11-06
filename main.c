@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) { // main doit avoir ces arguments pour SDL
     // Remplir la matrice avec des valeurs aléatoires
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < N; j++) {
-            matrice[i][j] = (rand() % 100 + 1 <= tauxCellulesVivantes20) ? 1 : 0;
+            matrice[i][j] = (rand() % 100 + 1 <= tauxCellulesVivantes) ? 1 : 0;
         }
     }
 
