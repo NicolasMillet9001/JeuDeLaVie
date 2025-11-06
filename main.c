@@ -3,7 +3,6 @@
 #include <time.h>
 #include <SDL.h>
 
-// Dimension de la matrice
 #define N 30
 #define CELL_SIZE 10
 #define WIDTH (N * CELL_SIZE)
@@ -26,7 +25,6 @@ void drawGrid(SDL_Renderer *renderer, int grid[N][N]) {
     SDL_RenderPresent(renderer);
 }
 
-
 void afficherMatrice(int matrice[N][N]) {
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < N; j++) {
@@ -42,7 +40,7 @@ void afficherMatrice(int matrice[N][N]) {
 }
 
 
-// Calcule dans une matrice temporaire l'état de la case [i][j] en fonction de la génération actuelle
+// Définie dans une matrice temporaire l'état de la case [i][j] en fonction de la génération actuelle
 void nextGeneration(int matrice[N][N], int matriceNplus1[N][N], int i, int j) {
     int compteurDeCellulesAdjacentesVivantes = 0;
     int currentState = matrice[i][j];
@@ -76,18 +74,13 @@ void nextGeneration(int matrice[N][N], int matriceNplus1[N][N], int i, int j) {
             matriceNplus1[i][j] = 0;
         }
     }
+
 }
 
-int main() {
-
-    //Définition du teux de cellules vivantes à la génération 0
-    int tauxCellulesVivantes = 50;
-    printf("Quelle est le taux de cellules vivantes a l'initialisation ? (Default : 50%%)\n");
-    if (scanf("%i", &tauxCellulesVivantes) != 1) {
-        // On vide le buffer pour éviter les boucles infinies
-
-        while (getchar() != '\n');
-    }
+int main(int argc, char* argv[]) { // main doit avoir ces arguments pour SDL
+    int taux = 50;
+    printf("Quelle est le taux de cellule vivante a l'initialisation ? (Default : 50%%)\n");
+    scanf("%i", &taux);
 
     //Pour avoir de vraies valeurs aléatoires
     srand(time(0));
@@ -97,7 +90,7 @@ int main() {
     // Remplir la matrice avec des valeurs aléatoires
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < N; j++) {
-            matrice[i][j] = (rand() % 100 + 1 <= tauxCellulesVivantes) ? 1 : 0;
+            matrice[i][j] = (rand() % 100 + 1 <= taux) ? 1 : 0;
         }
     }
 
@@ -144,16 +137,6 @@ int main() {
             // Optionnel : quitter avec la touche 'q'
             if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q) {
                 running = 0;
-    //boucle répétée pour toutes les nouvelles générations du jeu de la vie
-    do {
-        // matrice qui va garder en mémoire la prochaine génération
-        int matriceTemp[N][N];
-        printf("Generation %d\n", generation);
-        for (int i = 0; i < N; i++) {
-            for (int j = 0; j < N; j++) {
-                //Copie de l'état actuel de la cellule en cas de status quo
-                matriceTemp[i][j] = matrice[i][j];
-                nextGeneration(matrice,matriceTemp, i, j);
             }
         }
 
@@ -197,7 +180,6 @@ int main() {
 
     } // Fin de la boucle while(running)
 
-    }while (generation < 100);
 
     // --- Nettoyage de SDL ---
     SDL_DestroyRenderer(renderer);
