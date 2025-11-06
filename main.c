@@ -3,7 +3,7 @@
 #include <time.h>
 #include <SDL.h>
 
-#define N 30
+#define N 80
 #define CELL_SIZE 10
 #define WIDTH (N * CELL_SIZE)
 #define HEIGHT (N * CELL_SIZE)
@@ -77,13 +77,12 @@ void nextGeneration(int matrice[N][N], int matriceNplus1[N][N], int i, int j) {
 
 }
 
-int main(int argc, char* argv[]) { // main doit avoir ces arguments pour SDL
+int main(int argc, char* argv[]) {
     //Définition du teux de cellules vivantes à la génération 0
     int tauxCellulesVivantes = 50;
-    printf("Quelle est le taux de cellules vivantes a l'initialisation ? (Default : 50%%)\n");
+    printf("Quelle est le taux de cellule vivante a l'initialisation ? (Default : 50%%)\n");
     if (scanf("%i", &tauxCellulesVivantes) != 1) {
         // On vide le buffer pour éviter les boucles infinies
-
         while (getchar() != '\n');
     }
 
@@ -109,7 +108,7 @@ int main(int argc, char* argv[]) { // main doit avoir ces arguments pour SDL
                                         SDL_WINDOWPOS_CENTERED,
                                         SDL_WINDOWPOS_CENTERED,
                                         WIDTH, HEIGHT,
-                                        0); // Pas de flags particuliers
+                                        0);
     if (window == NULL) {
         fprintf(stderr, "Erreur lors de la création de la fenêtre : %s\n", SDL_GetError());
         SDL_Quit();
@@ -127,63 +126,111 @@ int main(int argc, char* argv[]) { // main doit avoir ces arguments pour SDL
     // --- Fin de l'initialisation de SDL ---
 
 
-    int generation = 1;
+    int generation = 0; // On commence à la génération 0
     int running = 1; // Variable pour contrôler la boucle principale
+    int isPaused = 1; // 1 = en pause, 0 = en cours (commence en pause)
     SDL_Event event; // Pour gérer les événements
+
+    // --- Affichage de l'état initial (Generation 0) ---
+    // On dessine la grille une première fois avant la boucle
+    drawGrid(renderer, matrice);
+
 
     // Boucle principale du jeu
     while (running) {
+
         // --- 1. Gestion des événements ---
-        // Vérifie si l'utilisateur veut quitter
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = 0;
             }
-            // Optionnel : quitter avec la touche 'q'
-            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q) {
-                running = 0;
+            // Gestion des touches clavier
+            if (event.type == SDL_KEYDOWN) {
+                switch (event.key.keysym.sym) {
+                    case SDLK_q: // 'q' pour quitter
+                        running = 0;
+                        break;
+                    case SDLK_SPACE: // 'Espace' pour mettre en pause/reprendre
+                        isPaused = !isPaused; // Bascule l'état de pause
+                        // Si on sort de la pause à la Gen 0, on passe à la Gen 1
+                        if (!isPaused && generation == 0) {
+                            generation = 1;
+                        }
+                        break;
+                }
             }
+        } // Fin de la boucle d'événements
+
+
+        // --- 2. Mise à jour du titre de la fenêtre (selon l'état) ---
+        char title[100];
+        if (isPaused) {
+            snprintf(title, 100, "Jeu de la Vie - Gen %d (PAUSE) - Espace pour démarrer", generation);
+        } else {
+            snprintf(title, 100, "Jeu de la Vie - Generation %d", generation);
         }
-
-        // --- 2. Logique du jeu (calcul de la prochaine génération) ---
-        int matriceTemp[N][N];
-
-        // Met à jour le titre de la fenêtre avec le numéro de génération
-        char title[50];
-        snprintf(title, 50, "Jeu de la Vie - Generation %d", generation);
         SDL_SetWindowTitle(window, title);
 
-        for (int i = 0; i < N; i++) {
-            for (int j = 0; j < N; j++) {
-                matriceTemp[i][j] = matrice[i][j]; // Copie état actuel
-                nextGeneration(matrice, matriceTemp, i, j); // Calcule N+1
+
+        // --- 3. Logique du jeu (uniquement si on N'EST PAS en pause) ---
+        if (!isPaused) {
+
+            // --- Calcul de la génération N+1 ---
+            int matriceTemp[N][N];
+            for (int i = 0; i < N; i++) {
+                for (int j = 0; j < N; j++) {
+                    matriceTemp[i][j] = matrice[i][j]; // Copie état actuel
+                    nextGeneration(matrice, matriceTemp, i, j); // Calcule N+1
+                }
             }
-        }
 
-        // --- 3. Affichage (remplace afficherMatrice) ---
-        drawGrid(renderer, matriceTemp);
+            // --- 4. Affichage ---
+            drawGrid(renderer, matriceTemp);
 
-        // --- 4. Mise à jour de l'état ---
-        // Copier la matrice temporaire dans la matrice principale
-        for (int i = 0; i < N; i++) {
-            for (int j = 0; j < N; j++) {
-                matrice[i][j] = matriceTemp[i][j];
+            // --- 5. Mise à jour de l'état ---
+            for (int i = 0; i < N; i++) {
+                for (int j = 0; j < N; j++) {
+                    matrice[i][j] = matriceTemp[i][j];
+                }
             }
+
+            generation++; // On passe à la génération suivante
+
+            // Pause de la simulation
+            SDL_Delay(GENERATION_DELAY_MS);
+
+        } else {
+            // Si on est en pause, on met quand même un petit délai
+            // pour ne pas que la boucle "while(running)" consomme 100% du CPU
+            SDL_Delay(100);
         }
-
-        // --- 5. Contrôle de la boucle ---
-        generation++;
-
-        // Arrête la simulation après 100 générations (comme l'original)
-        // Vous pouvez commenter cette ligne pour une simulation infinie
-        if (generation >= 100) {
-            running = 0;
-        }
-
-        // Pause pour ralentir la simulation (remplace system("pause"))
-        SDL_Delay(GENERATION_DELAY_MS);
 
     } // Fin de la boucle while(running)
+
+
+    // --- C'est ici que va le code que vous aviez collé ---
+    // --- Boucle de pause finale ---
+
+    // Met à jour le titre une dernière fois
+    char finalTitle[100];
+    snprintf(finalTitle, 100, "Jeu de la Vie - FIN (Gen %d) - 'q' ou 'X' pour quitter", generation - 1);
+    SDL_SetWindowTitle(window, finalTitle);
+
+    int pause = 1;
+    while (pause) {
+        // On vérifie juste les événements de fermeture
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                pause = 0;
+            }
+            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q) {
+                pause = 0;
+            }
+        }
+        // Petite pause pour ne pas utiliser 100% du CPU
+        SDL_Delay(100);
+    }
+    // --- Fin de la boucle de pause ---
 
 
     // --- Nettoyage de SDL ---
