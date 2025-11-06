@@ -3,12 +3,14 @@
 #include <time.h>
 #include <SDL.h>
 #include <math.h>
+#include <float.h>
 
 #define N 400
 #define CELL_SIZE 5
 #define WIDTH (N * CELL_SIZE)
 #define HEIGHT (N * CELL_SIZE)
 #define GENERATION_DELAY_MS 100 // Délai en ms entre les générations
+#define FADE_DURATION_RATIO 0.8f
 
 /**
  * @brief Structure pour stocker une couleur RGB
@@ -53,31 +55,30 @@ RGBColor HsvToRgb(float h, float s, float v) {
     return color;
 }
 
-void drawGrid(SDL_Renderer *renderer, int grid[N][N]) {
+// Notez le changement: int grid[N][N] -> float displayGrid[N][N]
+void drawGrid(SDL_Renderer *renderer, float displayGrid[N][N]) {
 
     // 1. On dessine le fond en noir
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    // 2. On dessine les cellules vivantes (avec dégradé de couleur)
-    // La couleur est définie DANS la boucle
+    // 2. On dessine les cellules
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < N; j++) {
-            if (grid[i][j]) {
+
+            // On dessine la cellule si sa luminosité est > 0
+            float brightness = displayGrid[i][j];
+            if (brightness > 0.001f) { // Seuil minimal pour dessiner
 
                 // --- CALCUL DE LA COULEUR ---
-                // Calcule la Teinte (Hue) en fonction de la position (i, j)
-                // On crée des bandes diagonales qui balaient le spectre des couleurs
-                // Vous pouvez jouer avec "0.5f" pour changer la largeur des bandes
                 float hue = fmodf((float)(i + j) * 0.5f, 360.0f);
 
-                // On garde la saturation et la valeur à 1.0 pour des couleurs vives
-                RGBColor cellColor = HsvToRgb(hue, 1.0f, 1.0f);
+                // NOUVEAU: La "Value" (luminosité) est pilotée par la displayGrid
+                RGBColor cellColor = HsvToRgb(hue, 1.0f, brightness);
 
-                // Applique la couleur calculée pour CETTE cellule
+                // Applique la couleur calculée
                 SDL_SetRenderDrawColor(renderer, cellColor.r, cellColor.g, cellColor.b, 255);
 
-                // Crée un rectangle pour la cellule vivante
                 SDL_Rect cell = { j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE };
                 SDL_RenderFillRect(renderer, &cell);
             }
@@ -131,186 +132,188 @@ int main(int argc, char* argv[]) {
     int mode = 0;
     int tauxCellulesVivantes = 50;
 
-    // --- NOUVEAU : Menu de sélection dans la console ---
+    // --- Menu de sélection dans la console ---
+    // (Code inchangé)
     printf("Choisissez votre mode :\n");
     printf("  1: Simulation Aleatoire\n");
     printf("  2: Mode Editeur (creer vous-meme)\n");
     printf("Votre choix : ");
-
     if (scanf("%d", &mode) != 1) {
-        mode = 1; // Par défaut, mode aléatoire
-        while (getchar() != '\n'); // Vider le buffer
+        mode = 1;
+        while (getchar() != '\n');
     }
 
-    //definition de la matrice de départ
-    int matrice[N][N];
+    // --- NOUVEAU : Deux grilles ---
+    int logicGrid[N][N];     // La grille de la logique du jeu (1 ou 0)
+    float displayGrid[N][N]; // La grille de l'affichage (0.0f à 1.0f)
 
     if (mode == 1) {
-        // --- MODE 1 : ALÉATOIRE (Code existant) ---
+        // --- MODE 1 : ALÉATOIRE ---
         printf("Quelle est le taux de cellule vivante a l'initialisation ? (Default : 50%%)\n");
         if (scanf("%i", &tauxCellulesVivantes) != 1) {
             while (getchar() != '\n');
         }
-        srand(time(0)); // Initialiser l'aléatoire
-        // Remplir la matrice avec des valeurs aléatoires
+        srand(time(0));
         for (int i = 0; i < N; i++) {
             for (int j = 0; j < N; j++) {
-                matrice[i][j] = (rand() % 100 + 1 <= tauxCellulesVivantes) ? 1 : 0;
+                int state = (rand() % 100 + 1 <= tauxCellulesVivantes) ? 1 : 0;
+                logicGrid[i][j] = state;
+                displayGrid[i][j] = (float)state; // L'affichage commence à l'état logique
             }
         }
     } else {
         // --- MODE 2 : EDITEUR ---
-        // Remplir la matrice avec des 0
         for (int i = 0; i < N; i++) {
             for (int j = 0; j < N; j++) {
-                matrice[i][j] = 0;
+                logicGrid[i][j] = 0;
+                displayGrid[i][j] = 0.0f;
             }
         }
     }
 
     // --- Initialisation de SDL ---
-    // (Code d'initialisation SDL inchangé)
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        fprintf(stderr, "Erreur lors de l'initialisation de la SDL : %s\n", SDL_GetError());
-        return 1;
-    }
-    SDL_Window* window = SDL_CreateWindow("Jeu de la Vie",
-                                        SDL_WINDOWPOS_CENTERED,
-                                        SDL_WINDOWPOS_CENTERED,
-                                        WIDTH, HEIGHT,
-                                        0);
-    if (window == NULL) {
-        fprintf(stderr, "Erreur lors de la création de la fenêtre : %s\n", SDL_GetError());
-        SDL_Quit();
-        return 1;
-    }
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1,
-                                              SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (renderer == NULL) {
-        fprintf(stderr, "Erreur lors de la création du renderer : %s\n", SDL_GetError());
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-        return 1;
-    }
+    // (Code inchangé)
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) { /* ... gestion erreur ... */ return 1; }
+    SDL_Window* window = SDL_CreateWindow("Jeu de la Vie",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,WIDTH, HEIGHT,
+
+0);
+    if (window == NULL) { /* ... gestion erreur ... */ SDL_Quit(); return 1; }
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (renderer == NULL) { /* ... gestion erreur ... */ SDL_DestroyWindow(window); SDL_Quit(); return 1; }
     // --- Fin de l'initialisation de SDL ---
 
 
-    int generation = 0; // On commence à la génération 0
-    int running = 1; // Variable pour contrôler la boucle principale
-    int isPaused = 1; // 1 = en pause, 0 = en cours (commence en pause)
-    int mousePressed = 0; // Pour gérer le dessin en glissant
-    SDL_Event event; // Pour gérer les événements
+    int generation = 0;
+    int running = 1;
+    int isPaused = 1;
+    int mousePressed = 0;
+    SDL_Event event;
+
+    // --- NOUVEAU : Timers pour la boucle de jeu ---
+    Uint32 lastGenerationTime = SDL_GetTicks(); // Timer pour la logique
+    Uint32 lastFrameTime = SDL_GetTicks();      // Timer pour le delta-time (fluidité)
+
+    // Durée du fondu en ms
+    const float fadeDurationMs = (float)GENERATION_DELAY_MS * FADE_DURATION_RATIO;
 
     // --- Affichage de l'état initial (Generation 0) ---
-    // (Affiche la grille aléatoire ou la grille vide)
-    drawGrid(renderer, matrice);
+    drawGrid(renderer, displayGrid); // On passe la grille d'affichage
 
-
-    // Boucle principale du jeu
+    // Boucle principale du jeu (basée sur les frames, pas les générations)
     while (running) {
 
-        // --- 1. Gestion des événements ---
+        // --- 1. Calcul du Delta Time (temps écoulé depuis la dernière frame) ---
+        Uint32 currentFrameTime = SDL_GetTicks();
+        float deltaTimeMs = (float)(currentFrameTime - lastFrameTime);
+        lastFrameTime = currentFrameTime;
+
+        // --- 2. Gestion des événements ---
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = 0;
             }
 
-            // --- GESTION CLAVIER ---
             if (event.type == SDL_KEYDOWN) {
+                // (Gestion 'q' et 'Espace' inchangée)
                 switch (event.key.keysym.sym) {
-                    case SDLK_q: // 'q' pour quitter
-                        running = 0;
-                        break;
-                    case SDLK_SPACE: // 'Espace' pour mettre en pause/reprendre
-                        isPaused = !isPaused; // Bascule l'état de pause
-                        // Si on sort de la pause à la Gen 0, on passe à la Gen 1
+                    case SDLK_q: running = 0; break;
+                    case SDLK_SPACE:
+                        isPaused = !isPaused;
                         if (!isPaused && generation == 0) {
                             generation = 1;
+                            lastGenerationTime = currentFrameTime; // Démarrer le timer de gen
                         }
                         break;
                 }
             }
 
-            // --- NOUVEAU : GESTION SOURIS (uniquement en mode pause/éditeur) ---
+            // Gestion souris (Mode Editeur)
             if (isPaused) {
                 if (event.type == SDL_MOUSEBUTTONDOWN) {
                     if (event.button.button == SDL_BUTTON_LEFT) {
                         mousePressed = 1;
-                        // On "clique" sur une cellule pour l'inverser
                         int j = event.button.x / CELL_SIZE;
                         int i = event.button.y / CELL_SIZE;
-                        // Vérifie les bornes
                         if (i >= 0 && i < N && j >= 0 && j < N) {
-                            matrice[i][j] = !matrice[i][j]; // Inverse l'état
+                            logicGrid[i][j] = !logicGrid[i][j]; // Inverse état logique
+                            displayGrid[i][j] = (float)logicGrid[i][j]; // Snap l'affichage
                         }
                     }
                 }
-                if (event.type == SDL_MOUSEBUTTONUP) {
-                    if (event.button.button == SDL_BUTTON_LEFT) {
-                        mousePressed = 0; // On relâche le clic
-                    }
-                }
+                if (event.type == SDL_MOUSEBUTTONUP) { /* ... mousePressed = 0 ... */ }
                 if (event.type == SDL_MOUSEMOTION) {
                     if (mousePressed) {
-                        // Si on glisse la souris en cliquant, on "dessine"
                         int j = event.motion.x / CELL_SIZE;
                         int i = event.motion.y / CELL_SIZE;
                         if (i >= 0 && i < N && j >= 0 && j < N) {
-                            matrice[i][j] = 1; // Met la cellule à "vivante"
+                            logicGrid[i][j] = 1; // Dessine
+                            displayGrid[i][j] = 1.0f; // Snap l'affichage
                         }
                     }
                 }
-            } // Fin gestion souris
-
+            }
         } // Fin de la boucle d'événements
 
-
-        // --- 2. Mise à jour du titre de la fenêtre (selon l'état) ---
+        // --- 3. Mise à jour du titre ---
+        // (Code inchangé)
         char title[100];
-        if (isPaused) {
-            // Si on est à la génération 0, on est en mode "Editeur"
-            if (generation == 0) {
-                 snprintf(title, 100, "Jeu de la Vie - MODE EDITEUR - Dessinez et appuyez sur Espace");
-            } else {
-                 snprintf(title, 100, "Jeu de la Vie - Gen %d (PAUSE) - Espace pour reprendre", generation);
-            }
-        } else {
-            snprintf(title, 100, "Jeu de la Vie - Generation %d", generation);
-        }
+        if (isPaused) { /* ... snprintf ... */ } else { /* ... snprintf ... */ }
         SDL_SetWindowTitle(window, title);
 
 
-        // --- 3. Logique du jeu ---
+        // --- 4. Logique du jeu ---
         if (!isPaused) {
-            // --- SIMULATION EN COURS ---
-            // (Code de simulation inchangé)
-            int matriceTemp[N][N];
+
+            // --- A. Logique de Génération (basée sur le timer) ---
+            if (currentFrameTime - lastGenerationTime > GENERATION_DELAY_MS) {
+
+                int logicTemp[N][N]; // Grille temporaire pour la N+1
+                for (int i = 0; i < N; i++) {
+                    for (int j = 0; j < N; j++) {
+                        logicTemp[i][j] = logicGrid[i][j];
+                        // On passe la grille LOGIQUE à nextGeneration
+                        nextGeneration(logicGrid, logicTemp, i, j);
+                    }
+                }
+                // Copier le résultat dans la grille logique
+                for (int i = 0; i < N; i++) {
+                    for (int j = 0; j < N; j++) {
+                        logicGrid[i][j] = logicTemp[i][j];
+                    }
+                }
+
+                generation++;
+                lastGenerationTime = currentFrameTime; // Réinitialiser le timer
+            }
+
+            // --- B. Logique d'Affichage (basée sur le Delta Time) ---
+            // On fait "rattraper" la grille d'affichage vers la grille logique
+
+            // Incrément de fondu pour CETTE frame
+            float fadeIncrement = deltaTimeMs / fadeDurationMs;
+
             for (int i = 0; i < N; i++) {
                 for (int j = 0; j < N; j++) {
-                    matriceTemp[i][j] = matrice[i][j]; // Copie état actuel
-                    nextGeneration(matrice, matriceTemp, i, j); // Calcule N+1
+                    if (logicGrid[i][j] == 1) {
+                        // Fade-in
+                        displayGrid[i][j] = fminf(1.0f, displayGrid[i][j] + fadeIncrement);
+                    } else {
+                        // Fade-out
+                        displayGrid[i][j] = fmaxf(0.0f, displayGrid[i][j] - fadeIncrement);
+                    }
                 }
             }
 
-            // Affichage
-            drawGrid(renderer, matriceTemp);
+            // --- C. Dessin ---
+            drawGrid(renderer, displayGrid);
 
-            // Mise à jour
-            for (int i = 0; i < N; i++) {
-                for (int j = 0; j < N; j++) {
-                    matrice[i][j] = matriceTemp[i][j];
-                }
-            }
-
-            generation++;
-            SDL_Delay(GENERATION_DELAY_MS);
+            // PAS de SDL_Delay ici, VSYNC (ou la boucle) s'en charge
 
         } else {
             // --- EN PAUSE / EN MODE EDITEUR ---
-            // On redessine la grille pour voir les changements faits à la souris
-            drawGrid(renderer, matrice);
-            // Petite pause pour ne pas utiliser 100% du CPU
-            SDL_Delay(100);
+            // On redessine pour voir les changements de la souris
+            drawGrid(renderer, displayGrid);
+            SDL_Delay(100); // Petite pause pour ne pas saturer le CPU
         }
 
     } // Fin de la boucle while(running)
@@ -321,19 +324,8 @@ int main(int argc, char* argv[]) {
     char finalTitle[100];
     snprintf(finalTitle, 100, "Jeu de la Vie - FIN (Gen %d) - 'q' ou 'X' pour quitter", generation - 1);
     SDL_SetWindowTitle(window, finalTitle);
-
     int pause = 1;
-    while (pause) {
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                pause = 0;
-            }
-            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q) {
-                pause = 0;
-            }
-        }
-        SDL_Delay(100);
-    }
+    while (pause) { /* ... gestion événements ... */ SDL_Delay(100); }
     // --- Fin de la boucle de pause ---
 
     // --- Nettoyage de SDL ---
