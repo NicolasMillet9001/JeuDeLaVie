@@ -78,9 +78,14 @@ void nextGeneration(int matrice[N][N], int matriceNplus1[N][N], int i, int j) {
 }
 
 int main(int argc, char* argv[]) { // main doit avoir ces arguments pour SDL
-    int taux = 50;
-    printf("Quelle est le taux de cellule vivante a l'initialisation ? (Default : 50%%)\n");
-    scanf("%i", &taux);
+    //Définition du teux de cellules vivantes à la génération 0
+    int tauxCellulesVivantes = 50;
+    printf("Quelle est le taux de cellules vivantes a l'initialisation ? (Default : 50%%)\n");
+    if (scanf("%i", &tauxCellulesVivantes) != 1) {
+        // On vide le buffer pour éviter les boucles infinies
+
+        while (getchar() != '\n');
+    }
 
     //Pour avoir de vraies valeurs aléatoires
     srand(time(0));
@@ -90,7 +95,7 @@ int main(int argc, char* argv[]) { // main doit avoir ces arguments pour SDL
     // Remplir la matrice avec des valeurs aléatoires
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < N; j++) {
-            matrice[i][j] = (rand() % 100 + 1 <= taux) ? 1 : 0;
+            matrice[i][j] = (rand() % 100 + 1 <= tauxCellulesVivantes20) ? 1 : 0;
         }
     }
 
