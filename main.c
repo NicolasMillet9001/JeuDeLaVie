@@ -3,7 +3,7 @@
 #include <time.h>
 #include <SDL.h>
 
-#define N 150
+#define N 50
 #define CELL_SIZE 5
 #define WIDTH (N * CELL_SIZE)
 #define HEIGHT (N * CELL_SIZE)
@@ -23,8 +23,8 @@ void drawGrid(SDL_Renderer *renderer, Cell grid[N][N]) {
             if (grid[i][j].alive) {
                 Uint8 age = grid[i][j].age;
                 Uint8 r = 255;  // Rouge max
-                Uint8 g = 255 - (age * 5 > 255 ? 255 : age * 5);  // Vert diminue
-                Uint8 b = 255;  // Bleu max
+                Uint8 g = 255 - (age > 255 ? 255 : age);  // Vert diminue
+                Uint8 b = 255 - (age > 255 ? 255 : age);  // Bleu diminue
                 SDL_SetRenderDrawColor(renderer, r, g, b, 255);
                 SDL_Rect cell = { j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE };
                 SDL_RenderFillRect(renderer, &cell);
@@ -53,7 +53,8 @@ void nextGeneration(Cell matrice[N][N], Cell matriceNplus1[N][N], int i, int j) 
     if (matrice[i][j].alive) {
         if (compteurDeCellulesAdjacentesVivantes == 2 || compteurDeCellulesAdjacentesVivantes == 3) {
             matriceNplus1[i][j].alive = 1;
-            matriceNplus1[i][j].age = matrice[i][j].age + 1;
+            if (matrice[i][j].age < 255)
+                matriceNplus1[i][j].age = matrice[i][j].age + 1;
         } else {
             matriceNplus1[i][j].alive = 0;
             matriceNplus1[i][j].age = 0;
