@@ -13,10 +13,76 @@ typedef struct {
 int N;
 int CELL_SIZE;
 
+// Motifs connus
+int glider[3][3] = {
+    {0, 1, 0},
+    {0, 0, 1},
+    {1, 1, 1}
+};
+
+int blinker[3][3] = {
+    {0, 0, 0},
+    {1, 1, 1},
+    {0, 0, 0}
+};
+
+int lwSpaceship[4][5] = {
+    {0, 1, 0, 0, 1},
+    {1, 0, 0, 0, 0},
+    {1, 0, 0, 0, 1},
+    {1, 1, 1, 1, 0}
+};
+
+int filler[27][27] = {
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,1,1,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,1,1,0,0,1,0,1,1,0,0,0,0},
+    {0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,0,1,0,1,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,1,0,1,1,0,0},
+    {0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,1,1,0,0},
+    {1,1,1,1,0,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,1,0,1,1,1,0,0},
+    {1,0,0,0,1,1,0,1,0,1,1,1,0,1,1,0,0,0,0,0,0,0,0,0,1,1,0},
+    {1,0,0,0,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0},
+    {0,1,0,0,1,1,0,1,0,0,1,0,0,1,0,1,1,0,0,0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1,0,0,0,0,0,1,1,1,1},
+    {0,1,0,0,1,1,0,1,0,0,1,0,0,1,0,0,1,1,0,1,0,1,1,0,0,0,1},
+    {1,0,0,0,0,0,1,1,0,0,0,1,0,1,0,1,0,0,0,1,1,0,0,0,0,0,1},
+    {1,0,0,0,1,1,0,1,0,1,1,0,0,1,0,0,1,0,0,1,0,1,1,0,0,1,0},
+    {1,1,1,1,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,0,1,0,0,1,0,1,1,0,0,1,0},
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,0,0,0,0,0,1},
+    {0,1,1,0,0,0,0,0,0,0,0,0,1,1,0,1,1,1,0,1,0,1,1,0,0,0,1},
+    {0,0,1,1,1,0,1,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,1,1,1,1},
+    {0,0,1,1,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0},
+    {0,0,1,1,0,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,1,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0},
+    {0,0,0,0,1,1,0,1,0,0,1,1,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,1,1,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+};
+
+
+
+void placePattern(Cell **grid, int *pattern, int rows, int cols, int startX, int startY) {
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            if (pattern[i * cols + j] == 1) {
+                int gridX = startX + i;
+                int gridY = startY + j;
+                if (gridX >= 0 && gridX < N && gridY >= 0 && gridY < N) {
+                    grid[gridX][gridY].alive = 1;
+                    grid[gridX][gridY].age = 1;
+                }
+            }
+        }
+    }
+}
+
 void drawGrid(SDL_Renderer *renderer, Cell **grid, int cell_size, int offset_x, int offset_y) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
-
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_Rect border = { offset_x - 1, offset_y - 1, N * cell_size + 2, N * cell_size + 2 };
     SDL_RenderDrawRect(renderer, &border);
@@ -25,9 +91,10 @@ void drawGrid(SDL_Renderer *renderer, Cell **grid, int cell_size, int offset_x, 
         for (int j = 0; j < N; j++) {
             if (grid[i][j].alive) {
                 Uint8 age = grid[i][j].age;
+                float normalized_age = (age > 100) ? 1.0f : (age / 100.0f);
                 Uint8 r = 255;
-                Uint8 g = 255 - (age > 255 ? 255 : age);
-                Uint8 b = 255 - (age > 255 ? 255 : age);
+                Uint8 g = 255 - (Uint8)(normalized_age * 255);
+                Uint8 b = 255 - (Uint8)(normalized_age * 255);
                 SDL_SetRenderDrawColor(renderer, r, g, b, 255);
                 SDL_Rect cell = { offset_x + j * cell_size, offset_y + i * cell_size, cell_size, cell_size };
                 SDL_RenderFillRect(renderer, &cell);
@@ -72,7 +139,6 @@ void nextGeneration(Cell **matrice, Cell **matriceNplus1, int n, int i, int j) {
     }
 }
 
-// Fonction pour réinitialiser la grille
 void resetGrid(Cell **grid, int mode, int tauxCellulesVivantes) {
     if (mode == 1) {
         srand(time(0));
@@ -103,7 +169,6 @@ int main(int argc, char* argv[]) {
         mode = 1;
         while (getchar() != '\n');
     }
-
     if (mode == 1) {
         printf("Quelle est le taux de cellule vivante a l'initialisation ? (Default : 50%%)\n");
         if (scanf("%i", &tauxCellulesVivantes) != 1) {
@@ -114,18 +179,17 @@ int main(int argc, char* argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         return 1;
     }
+
     SDL_DisplayMode displayMode;
     SDL_GetCurrentDisplayMode(0, &displayMode);
-    int screenWidth = displayMode.w;
-    int screenHeight = displayMode.h;
-
+    int screenWidth = displayMode.w - 1;
+    int screenHeight = displayMode.h - 1;
     float ratio = (float)screenWidth / (float)screenHeight;
     int maxWidthCells = screenWidth / 8;
     int maxHeightCells = screenHeight / 8;
     N = (maxWidthCells < maxHeightCells) ? maxWidthCells : maxHeightCells;
     if (N > 200) N = 200;
     CELL_SIZE = (screenWidth < screenHeight) ? (screenWidth / N) : (screenHeight / N);
-
     int gridWidth = N * CELL_SIZE;
     int gridHeight = N * CELL_SIZE;
     int offset_x = (screenWidth - gridWidth) / 2;
@@ -136,7 +200,6 @@ int main(int argc, char* argv[]) {
         logicGrid[i] = malloc(N * sizeof(Cell));
     }
 
-    // Initialisation de la grille
     resetGrid(logicGrid, mode, tauxCellulesVivantes);
 
     SDL_Window* window = SDL_CreateWindow(
@@ -170,7 +233,6 @@ int main(int argc, char* argv[]) {
     int mousePressed = 0;
     SDL_Event event;
     Uint32 lastGenerationTime = SDL_GetTicks();
-
     drawGrid(renderer, logicGrid, CELL_SIZE, offset_x, offset_y);
 
     while (running) {
@@ -198,11 +260,51 @@ int main(int argc, char* argv[]) {
                             SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
                         }
                         break;
-                    case SDLK_r:  // Réinitialiser la grille
+                    case SDLK_r:
                         resetGrid(logicGrid, mode, tauxCellulesVivantes);
                         generation = 0;
                         isPaused = 1;
                         drawGrid(renderer, logicGrid, CELL_SIZE, offset_x, offset_y);
+                        break;
+                    case SDLK_1:
+                        if (isPaused) {
+                            int mouseX, mouseY;
+                            SDL_GetMouseState(&mouseX, &mouseY);
+                            int j = (mouseX - offset_x) / CELL_SIZE;
+                            int i = (mouseY - offset_y) / CELL_SIZE;
+                            placePattern(logicGrid, (int*)glider, 3, 3, i, j);
+                            drawGrid(renderer, logicGrid, CELL_SIZE, offset_x, offset_y);
+                        }
+                        break;
+                    case SDLK_2:
+                        if (isPaused) {
+                            int mouseX, mouseY;
+                            SDL_GetMouseState(&mouseX, &mouseY);
+                            int j = (mouseX - offset_x) / CELL_SIZE;
+                            int i = (mouseY - offset_y) / CELL_SIZE;
+                            placePattern(logicGrid, (int*)blinker, 3, 3, i, j);
+                            drawGrid(renderer, logicGrid, CELL_SIZE, offset_x, offset_y);
+                        }
+                        break;
+                    case SDLK_3:
+                        if (isPaused) {
+                            int mouseX, mouseY;
+                            SDL_GetMouseState(&mouseX, &mouseY);
+                            int j = (mouseX - offset_x) / CELL_SIZE;
+                            int i = (mouseY - offset_y) / CELL_SIZE;
+                            placePattern(logicGrid, (int*)lwSpaceship, 4, 5, i, j);
+                            drawGrid(renderer, logicGrid, CELL_SIZE, offset_x, offset_y);
+                        }
+                        break;
+                    case SDLK_4:
+                        if (isPaused) {
+                            int mouseX, mouseY;
+                            SDL_GetMouseState(&mouseX, &mouseY);
+                            int j = (mouseX - offset_x) / CELL_SIZE;
+                            int i = (mouseY - offset_y) / CELL_SIZE;
+                            placePattern(logicGrid, (int*)filler, 27, 27, i, j);
+                            drawGrid(renderer, logicGrid, CELL_SIZE, offset_x, offset_y);
+                        }
                         break;
                 }
             }
@@ -239,9 +341,9 @@ int main(int argc, char* argv[]) {
         char title[100];
         if (isPaused) {
             if (generation == 0) {
-                snprintf(title, 100, "Mode Editeur - Dessinez puis Espace (R pour réinitialiser)");
+                snprintf(title, 100, "Mode Editeur - Dessinez puis Espace (R pour réinitialiser, 1/2/3/4 pour motifs)");
             } else {
-                snprintf(title, 100, "Gen %d (PAUSE - R pour réinitialiser)", generation);
+                snprintf(title, 100, "Gen %d (PAUSE - R pour réinitialiser, 1/2/3/4 pour motifs)", generation);
             }
         } else {
             snprintf(title, 100, "Gen %d (R pour réinitialiser)", generation);
