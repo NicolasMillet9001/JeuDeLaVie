@@ -3,6 +3,7 @@
 #include <time.h>
 #include <SDL.h>
 #include <math.h>
+#include <stdbool.h>
 
 // --- DIMENSIONS ---
 #define N_3D 40          // Taille du cube 3D
@@ -13,6 +14,20 @@
 #define SCROLL_SPEED 15.0f
 #define SCROLL_MARGIN 50
 
+// Structure pour stocker le chemin de la fourmi
+typedef struct {
+    int* x;
+    int* y;
+    int size;
+    int capacity;
+} AntPath;
+
+// Structure pour la fourmi de Langton
+typedef struct {
+    int x, y;            // Position actuelle
+    int prev_x, prev_y;  // Position précédente
+    int direction;       // 0: haut, 1: droite, 2: bas, 3: gauche
+} LangtonAnt;
 
 static const int filler[27][27] = {
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0},
@@ -154,9 +169,75 @@ void nextGeneration3D(int grid[N_3D][N_3D][N_3D], int nextGrid[N_3D][N_3D][N_3D]
     }
 }
 
+// Fonctions pour gérer l'historique du chemin
+void initAntPath(AntPath* path, int initialCapacity) {
+    path->x = (int*)malloc(initialCapacity * sizeof(int));
+    path->y = (int*)malloc(initialCapacity * sizeof(int));
+    path->size = 0;
+    path->capacity = initialCapacity;
+}
+
+void addToAntPath(AntPath* path, int x, int y) {
+    if (path->size == path->capacity) {
+        path->capacity *= 2;
+        path->x = (int*)realloc(path->x, path->capacity * sizeof(int));
+        path->y = (int*)realloc(path->y, path->capacity * sizeof(int));
+    }
+    path->x[path->size] = x;
+    path->y[path->size] = y;
+    path->size++;
+}
+
+void freeAntPath(AntPath* path) {
+    free(path->x);
+    free(path->y);
+    path->size = 0;
+    path->capacity = 0;
+}
+
 // --- 2D INFINIE (Ou presque) ---
-// Modification : Ajout du paramètre showGrid
-void draw2D(SDL_Renderer *renderer, int grid[N_2D][N_2D], float currentScale, float camX, float camY, int winW, int winH, int showGrid) {
+void updateLangtonAnt(int grid[N_2D][N_2D], LangtonAnt* ant, AntPath* path, bool antModifiesGrid) {
+    // Stocke l'ancienne position
+    ant->prev_x = ant->x;
+    ant->prev_y = ant->y;
+
+    // Modifie la case actuelle avant de bouger
+    if (antModifiesGrid) {
+        if (grid[ant->x][ant->y] == 0) {
+            grid[ant->x][ant->y] = 1; // Colorie la case en noir
+        } else {
+            grid[ant->x][ant->y] = 0; // Colorie la case en blanc
+        }
+    }
+
+    // Change de direction en fonction de la couleur de la case actuelle
+    int color = grid[ant->x][ant->y];
+    if (color == 0) {
+        ant->direction = (ant->direction + 1) % 4; // Tourne à droite
+    } else {
+        ant->direction = (ant->direction - 1 + 4) % 4; // Tourne à gauche
+    }
+
+    // Avance
+    switch (ant->direction) {
+        case 0: ant->y--; break; // Haut
+        case 1: ant->x++; break; // Droite
+        case 2: ant->y++; break; // Bas
+        case 3: ant->x--; break; // Gauche
+    }
+
+    // Gestion des bords (rebond)
+    if (ant->x < 0) ant->x = N_2D - 1;
+    if (ant->x >= N_2D) ant->x = 0;
+    if (ant->y < 0) ant->y = N_2D - 1;
+    if (ant->y >= N_2D) ant->y = 0;
+
+    // Ajoute la nouvelle position à l'historique
+    addToAntPath(path, ant->x, ant->y);
+}
+
+// Modification : Ajout du paramètre showGrid et du chemin
+void draw2D(SDL_Renderer *renderer, int grid[N_2D][N_2D], float currentScale, float camX, float camY, int winW, int winH, int showGrid, LangtonAnt ant, AntPath* path) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
     float cx = winW / 2.0f;
@@ -193,7 +274,7 @@ void draw2D(SDL_Renderer *renderer, int grid[N_2D][N_2D], float currentScale, fl
             if (age > 0) {
                 int screenX = (int)(cx + (i - offset) * size + camX);
                 int screenY = (int)(cy + (j - offset) * size + camY);
-                int green_blue_val = 255 - (age * 5);
+                int green_blue_val = 255 - (age * 3);
                 if (green_blue_val < 0) green_blue_val = 0;
                 SDL_SetRenderDrawColor(renderer, 255, (Uint8)green_blue_val, (Uint8)green_blue_val, 255);
                 SDL_Rect cell = { screenX, screenY, size, size };
@@ -202,6 +283,22 @@ void draw2D(SDL_Renderer *renderer, int grid[N_2D][N_2D], float currentScale, fl
             }
         }
     }
+    // --- DESSIN DU CHEMIN DE LA FOURMI ---
+    SDL_SetRenderDrawColor(renderer, 100, 100, 255, 255); // Bleu clair
+    for (int i = 1; i < path->size; i++) {
+        int prevX = (int)(cx + (path->x[i-1] - offset) * size + camX + size/2);
+        int prevY = (int)(cy + (path->y[i-1] - offset) * size + camY + size/2);
+        int currX = (int)(cx + (path->x[i] - offset) * size + camX + size/2);
+        int currY = (int)(cy + (path->y[i] - offset) * size + camY + size/2);
+        SDL_RenderDrawLine(renderer, prevX, prevY, currX, currY);
+    }
+
+    // --- DESSIN DE LA FOURMI ---
+    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Bleu
+    int antScreenX = (int)(cx + (ant.x - offset) * size + camX + size/2);
+    int antScreenY = (int)(cy + (ant.y - offset) * size + camY + size/2);
+    SDL_Rect antRect = { antScreenX - size/4, antScreenY - size/4, size/2, size/2 };
+    SDL_RenderFillRect(renderer, &antRect);
     SDL_RenderPresent(renderer);
 }
 
@@ -213,7 +310,7 @@ void nextGeneration2D(int grid[N_2D][N_2D], int nextGrid[N_2D][N_2D]) {
             if(grid[i-1][j-1]) neighbors++; if(grid[i][j-1]) neighbors++; if(grid[i+1][j-1]) neighbors++;
             if(grid[i-1][j])   neighbors++;                               if(grid[i+1][j])   neighbors++;
             if(grid[i-1][j+1]) neighbors++; if(grid[i][j+1]) neighbors++; if(grid[i+1][j+1]) neighbors++;
-            if (currentAge > 0) nextGrid[i][j] = (neighbors == 2 || neighbors == 3) ? currentAge + 1 : 0;
+            if (currentAge > 0) nextGrid[i][j] = (neighbors == 3 || neighbors == 2) ? currentAge + 1 : 0;
             else nextGrid[i][j] = (neighbors == 3) ? 1 : 0;
         }
     }
@@ -222,7 +319,7 @@ void nextGeneration2D(int grid[N_2D][N_2D], int nextGrid[N_2D][N_2D]) {
 // ==========================================
 // MENU
 // ==========================================
-void drawMenu(SDL_Renderer* renderer, int winW, int winH, int selectedMode, int taux, int is3D) {
+void drawMenu(SDL_Renderer* renderer, int winW, int winH, int selectedMode, int taux, int is3D, bool antModifiesGrid) {
     SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
     SDL_RenderClear(renderer);
     // Toggle 2D/3D
@@ -244,6 +341,17 @@ void drawMenu(SDL_Renderer* renderer, int winW, int winH, int selectedMode, int 
     // Icone Crayon
     SDL_Rect dot = {btn2.x+90, btn2.y+65, 20, 20}; SDL_RenderFillRect(renderer, &dot);
     drawChar(renderer, btn2.x+80, btn2.y+160, 5, 'E');
+    // Toggle "Fourmi modifie la grille"
+    SDL_Rect btnAntModifiesGrid = {winW/2 - 100, winH/2 - 30, 200, 40};
+    if (antModifiesGrid) SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); else SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+    SDL_RenderDrawRect(renderer, &btnAntModifiesGrid);
+    drawChar(renderer, btnAntModifiesGrid.x + 10, btnAntModifiesGrid.y + 5, 4, 'A');
+    drawChar(renderer, btnAntModifiesGrid.x + 20, btnAntModifiesGrid.y + 5, 4, 'n');
+    drawChar(renderer, btnAntModifiesGrid.x + 30, btnAntModifiesGrid.y + 5, 4, 't');
+    drawChar(renderer, btnAntModifiesGrid.x + 40, btnAntModifiesGrid.y + 5, 4, ' ');
+    drawChar(renderer, btnAntModifiesGrid.x + 50, btnAntModifiesGrid.y + 5, 4, 'm');
+    drawChar(renderer, btnAntModifiesGrid.x + 60, btnAntModifiesGrid.y + 5, 4, 'o');
+    drawChar(renderer, btnAntModifiesGrid.x + 70, btnAntModifiesGrid.y + 5, 4, 'd');
     // Slider Taux (Uniquement si Random)
     if (selectedMode == 1) {
         SDL_Rect barBg = {winW/4, 2*winH/3, winW/2, 20};
@@ -280,6 +388,9 @@ int main(int argc, char* argv[]) {
     static int nextGrid2D[N_2D][N_2D];
     static int initialGrid3D[N_3D][N_3D][N_3D];
     static int initialGrid2D[N_2D][N_2D];
+    LangtonAnt ant; // Déclaration de la fourmi
+    AntPath antPath; // Historique du chemin
+    bool antModifiesGrid = true; // Par défaut, la fourmi modifie la grille
 
     while (programRunning) {
         // --- PHASE MENU ---
@@ -303,12 +414,14 @@ int main(int argc, char* argv[]) {
                     if (e.key.keysym.sym == SDLK_UP && taux < 100) taux += 5;
                     if (e.key.keysym.sym == SDLK_DOWN && taux > 5) taux -= 5;
                     if (e.key.keysym.sym == SDLK_RETURN) inMenu = 0;
+                    if (e.key.keysym.sym == SDLK_m) antModifiesGrid = !antModifiesGrid; // Toggle "Fourmi modifie la grille"
                 }
                 if (e.type == SDL_MOUSEBUTTONDOWN) {
                     int mx = e.button.x; int my = e.button.y;
-                    if (mx > winWidth/2-80 && mx < winWidth/2+80 && my > 50 && my < 110) is3D = !is3D; // Toggle
+                    if (mx > winWidth/2-80 && mx < winWidth/2+80 && my > 50 && my < 110) is3D = !is3D; // Toggle 2D/3D
                     if (mx > winWidth/4-100 && mx < winWidth/4+100 && my > winHeight/3 && my < winHeight/3+150) selectedMode = 1; // Random
                     if (mx > 3*winWidth/4-100 && mx < 3*winWidth/4+100 && my > winHeight/3 && my < winHeight/3+150) selectedMode = 2; // Edition
+                    if (mx > winWidth/2-100 && mx < winWidth/2+100 && my > winHeight/2-30 && my < winHeight/2+10) antModifiesGrid = !antModifiesGrid; // Toggle "Fourmi modifie la grille"
                     if (mx > winWidth/2-100 && mx < winWidth/2+100 && my > 4*winHeight/5 && my < 4*winHeight/5+60) inMenu = 0; // Start
                     if (selectedMode == 1 && my > 2*winHeight/3 && my < 2*winHeight/3+20) { // Slider
                         int relX = mx - (winWidth/4);
@@ -318,7 +431,7 @@ int main(int argc, char* argv[]) {
                     }
                 }
             }
-            drawMenu(renderer, winWidth, winHeight, selectedMode, taux, is3D);
+            drawMenu(renderer, winWidth, winHeight, selectedMode, taux, is3D, antModifiesGrid);
             SDL_Delay(16);
         }
         if (!programRunning) break;
@@ -351,6 +464,17 @@ int main(int argc, char* argv[]) {
                 for(int i=0; i<N_2D; i++) for(int j=0; j<N_2D; j++) initialGrid2D[i][j] = 0;
             }
         }
+        // Initialisation de l'historique du chemin de la fourmi
+        initAntPath(&antPath, 1000);
+
+        // Initialisation de la fourmi
+        ant.x = N_2D / 2;
+        ant.y = N_2D / 2;
+        ant.prev_x = ant.x;
+        ant.prev_y = ant.y;
+        ant.direction = 0; // Direction initiale : haut
+        addToAntPath(&antPath, ant.x, ant.y); // Ajoute la position initiale
+
         int generationDelay = 50;
         float angleX = 0.0f; float angleY = 0.0f;
         float currentScale = is3D ? 10.0f : 20.0f; // Zoom par défaut
@@ -387,6 +511,7 @@ int main(int argc, char* argv[]) {
                         case SDLK_ESCAPE: programRunning = 0; break;
                         case SDLK_BACKSPACE: gameRunning = 0; break;
                         case SDLK_SPACE: paused = !paused; break;
+                        case SDLK_m: antModifiesGrid = !antModifiesGrid; break; // Toggle "Fourmi modifie la grille"
                         case SDLK_F11:
                             isFullscreen = !isFullscreen;
                             SDL_SetWindowFullscreen(window, isFullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
@@ -436,6 +561,14 @@ int main(int argc, char* argv[]) {
                             }
                             generation = 0;
                             angleX = 0.0f; angleY = 0.0f; currentScale = is3D ? 10.0f : 20.0f; camX = 0; camY = 0;
+                            // Réinitialise le chemin de la fourmi
+                            freeAntPath(&antPath);
+                            initAntPath(&antPath, 1000);
+                            ant.x = N_2D / 2;
+                            ant.y = N_2D / 2;
+                            ant.prev_x = ant.x;
+                            ant.prev_y = ant.y;
+                            addToAntPath(&antPath, ant.x, ant.y);
                             break;
                     }
                 }
@@ -456,6 +589,9 @@ int main(int argc, char* argv[]) {
                 }
             }
             if (!paused && SDL_GetTicks() - lastGenTime > generationDelay) {
+                if (!is3D) {
+                    updateLangtonAnt(grid2D, &ant, &antPath, antModifiesGrid); // Mise à jour de la fourmi et du chemin
+                }
                 if (is3D) {
                     nextGeneration3D(grid3D, nextGrid3D);
                     for(int i=0; i<N_3D; i++) for(int j=0; j<N_3D; j++) for(int k=0; k<N_3D; k++) grid3D[i][j][k] = nextGrid3D[i][j][k];
@@ -470,18 +606,20 @@ int main(int argc, char* argv[]) {
                 drawCube(renderer, grid3D, angleX, angleY, currentScale, camX, camY, winWidth, winHeight);
             } else {
                 // On passe (selectedMode == 2) pour afficher la grille si on est en édition
-                draw2D(renderer, grid2D, currentScale, camX, camY, winWidth, winHeight, (selectedMode == 2));
+                draw2D(renderer, grid2D, currentScale, camX, camY, winWidth, winHeight, (selectedMode == 2), ant, &antPath);
             }
             char title[100];
             // Ajout de l'info "[P] PASTE" dans le titre si en mode édition 2D
             if (!is3D && selectedMode == 2) {
-                 snprintf(title, 100, "2D EDITION | Gen: %d | [BACK] MENU | [P] PASTE | [SPACE] RUN | [R] RESET", generation);
+                 snprintf(title, 100, "2D EDITION | Gen: %d | [BACK] MENU | [P] PASTE | [SPACE] RUN | [R] RESET | [M] TOGGLE ANT MODIFIES GRID", generation);
             } else {
-                 snprintf(title, 100, "%s | Gen: %d | [BACK] MENU | %s | [R] RESET", is3D?"3D":"2D", generation, paused?"PAUSE":"RUN");
+                 snprintf(title, 100, "%s | Gen: %d | [BACK] MENU | %s | [R] RESET | [M] TOGGLE ANT MODIFIES GRID", is3D?"3D":"2D", generation, paused?"PAUSE":"RUN");
             }
             SDL_SetWindowTitle(window, title);
             SDL_Delay(16);
         }
+        // Libère l'historique à la fin de la boucle de jeu
+        freeAntPath(&antPath);
     }
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
